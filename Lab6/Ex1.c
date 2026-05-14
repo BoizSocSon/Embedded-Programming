@@ -8,17 +8,13 @@
 
 #include "stm32f4xx_hal.h"
 
-void init_led_pa5(void);
-void init_timer2(void);
+void init_led();
 void delay_ms_up(uint32_t ms);
 void delay_ms_down(uint32_t ms);
 
-
-int main(void) {
-    init_led_pa5();
-    init_timer2();
-
-    while(1){
+int main(){
+	init_led();
+	while(1){
 		GPIOA->ODR |= 1 << 5;
 		delay_ms_up(1000);
 		GPIOA->ODR &= ~(1 << 5);
@@ -26,27 +22,9 @@ int main(void) {
 	}
 }
 
-void init_led_pa5(void) {
-    // Bật clock Port A
-    RCC->AHB1ENR |= (1 << 0);
-    // Cấu hình PA5 là Output
-    GPIOA->MODER &= ~(3 << 10);
-    GPIOA->MODER |= (1 << 10);
-}
-
-void init_timer2(void) {
-    // 1. Cấu hình PSC và ARR
-    // Bật clock cho TIM2
-    RCC->APB1ENR |= (1 << 0);
-
-    // Thiết lập PSC để có tần số đếm 1kHz (1ms mỗi tick)
-    TIM2->PSC = 16000 - 1;
-
-    // Thiết lập ARR là 1 để cờ UIF bật mỗi 1ms
-    TIM2->ARR = 1 - 1;
-
-    // Cho phép bộ đếm hoạt động (CEN bit)
-    TIM2->CR1 |= (1 << 0);
+void init_led(){
+	RCC->AHB1ENR |= 1 << 0;
+	GPIOA->MODER |= 1 << 10;
 }
 
 void delay_ms_up(uint32_t ms){
@@ -77,4 +55,81 @@ void delay_ms_down(uint32_t ms){
 	TIM2->SR &= ~(1 << 0);
 
 	TIM2->CR1 &= ~(1 << 0);
+}
+
+
+
+
+
+
+
+#include "stm32f4xx_hal.h"
+
+void init_led();
+void delay_ms_up(uint32_t ms);
+void delay_ms_down(uint32_t ms);
+
+int main(){
+
+	init_led(); // Khởi tạo chân PA5 làm output điều khiển LED
+
+	while(1){
+
+		GPIOA->ODR |= 1 << 5; // Ghi bit 1 vào PA5 -> LED sáng
+
+		delay_ms_up(1000); // Delay 1000ms bằng timer đếm tiến
+
+		GPIOA->ODR &= ~(1 << 5); // Xóa bit PA5 -> LED tắt
+
+		delay_ms_down(2000); // Delay 2000ms bằng timer đếm lùi
+	}
+}
+
+void init_led(){
+
+	RCC->AHB1ENR |= 1 << 0; // Bật clock cho GPIOA
+
+	GPIOA->MODER |= 1 << 10; // Set PA5 ở mode output (01)
+}
+
+void delay_ms_up(uint32_t ms){
+
+	RCC->APB1ENR |= 1 << 0; // Bật clock cho Timer2
+
+	TIM2->PSC = 16000 - 1; // Chia clock 16MHz xuống 1kHz -> mỗi tick = 1ms
+
+	TIM2->ARR = ms - 1; // Timer sẽ đếm tới ms-1 rồi tràn
+
+	TIM2->CR1 &= ~(1 << 4); // DIR = 0 -> chế độ đếm tiến (0 -> ARR)
+
+	TIM2->CNT = 0; // Giá trị bắt đầu đếm = 0
+
+	TIM2->CR1 |= 1 << 0; // CEN = 1 -> bật timer
+
+	while(!(TIM2->SR & 1 << 0)); // Chờ tới khi UIF = 1 (timer tràn)
+
+	TIM2->SR &= ~(1 << 0); // Xóa cờ UIF
+
+	TIM2->CR1 &= ~(1 << 0); // Tắt timer
+}
+
+void delay_ms_down(uint32_t ms){
+
+	RCC->APB1ENR |= 1 << 0; // Bật clock cho Timer2
+
+	TIM2->PSC = 16000 - 1; // Chia clock xuống 1kHz -> mỗi tick = 1ms
+
+	TIM2->ARR = ms - 1; // Giá trị giới hạn đếm
+
+	TIM2->CR1 |= 1 << 4; // DIR = 1 -> chế độ đếm lùi (ARR -> 0)
+
+	TIM2->CNT = ms - 1; // Nạp giá trị bắt đầu đếm
+
+	TIM2->CR1 |= 1 << 0; // Bật timer
+
+	while(!(TIM2->SR & 1 << 0)); // Chờ cờ UIF bật khi đếm xong
+
+	TIM2->SR &= ~(1 << 0); // Xóa cờ UIF
+
+	TIM2->CR1 &= ~(1 << 0); // Tắt timer
 }

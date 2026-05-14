@@ -1,55 +1,92 @@
-#include "stm32f4xx.h"
+#include "stm32f401xe.h"
 
-void UART2_Config(void);
-void UART2_SendChar(char c);
-void UART2_SendString(char *str);
+void USART2_Init(){
+	RCC->AHB1ENR |= 1 << 0;
+	RCC->APB1ENR |= 1 << 17;
 
-int main(void) {
-    UART2_Config();
-    
-    while (1) {
-        UART2_SendString("Hello, STM32!\r\n");
-        // Delay đơn giản bằng vòng lặp
-        for (int i = 0; i < 1000000; i++); 
-    }
+	GPIOA->MODER |= 1 << 5;
+	GPIOA->AFR[0] |= 7 << 8;
+
+	USART2->BRR = 0x0683;
+	USART2->CR1 |= 1 << 3;
+	USART2->CR1 |= 1 << 13;
 }
 
-void UART2_Config(void) {
-    // 1. Bật Clock cho GPIOA và UART2
-    RCC->AHB1ENR |= (1 << 0);       // GPIOA EN
-    RCC->APB1ENR |= (1 << 17);      // UART2 EN
-
-    // 2. Cấu hình chân PA2 (TX) và PA3 (RX) là Alternate Function
-    GPIOA->MODER &= ~((3 << 4) | (3 << 6)); // Clear bit
-    GPIOA->MODER |=  ((2 << 4) | (2 << 6)); // Set mode AF (10)
-
-    // 3. Chọn AF7 (UART2) cho PA2 và PA3 trong thanh ghi AFR
-    // AFR[0] tương ứng AFRL, AFR[1] tương ứng AFRH
-    GPIOA->AFR[0] |= (7 << 8);  // PA2 -> AF7
-    GPIOA->AFR[0] |= (7 << 12); // PA3 -> AF7
-
-    // 4. Cấu hình Baud rate = 9600
-    // Giả sử PCLK1 = 16MHz (mặc định HSI), Over sampling = 16
-    // USARTDIV = 16.000.000 / (16 * 9600) = 104.166
-    // Mantissa = 104 (0x68), Fraction = 0.166 * 16 = 2.6 ~ 3 (0x3)
-    USART2->BRR = (104 << 4) | 3;
-
-    // 5. Cấu hình CR1: Bật UART, Bật TX, Bật RX, 8-bit data
-    USART2->CR1 |= (1 << 13); // UE = 1 (UART Enable)
-    USART2->CR1 |= (1 << 3);  // TE = 1 (Transmitter Enable)
-    USART2->CR1 |= (1 << 2);  // RE = 1 (Receiver Enable)
-    
-    // CR2 mặc định là 1 Stop bit (00), không cần chỉnh
+void USART2_SendChar(char c){
+	while(!(USART2->SR & 1 << 7));
+	USART2->DR = c;
 }
 
-void UART2_SendChar(char c) {
-    // Chờ cho đến khi thanh ghi truyền trống (TXE = 1)
-    while (!(USART2->SR & (1 << 7)));
-    USART2->DR = (c & 0xFF);
+void USART2_SendString(const char *str){
+	while(*str){
+		USART2_SendChar(*str++);
+	}
 }
 
-void UART2_SendString(char *str) {
-    while (*str) {
-        UART2_SendChar(*str++);
-    }
+int main(){
+	USART2_Init();
+	USART2_SendString("Hello word\r\n");
+	while(1);
+}
+
+
+
+
+
+
+
+#include "stm32f401xe.h"
+
+void USART2_Init(){
+
+	RCC->AHB1ENR |= 1 << 0; // Bật clock cho GPIOA
+	RCC->APB1ENR |= 1 << 17; // Bật clock cho USART2
+
+	GPIOA->MODER |= 1 << 5;
+	// PA2 chuyển sang Alternate Function mode
+	// PA2 dùng làm chân TX của USART2
+
+	GPIOA->AFR[0] |= 7 << 8;
+	// Chọn AF7 cho PA2
+	// AF7 tương ứng USART2
+
+	USART2->BRR = 0x0683;
+	// Thiết lập baudrate
+	// Với clock 16MHz -> baudrate khoảng 9600
+
+	USART2->CR1 |= 1 << 3;
+	// TE = 1
+	// Cho phép truyền dữ liệu (Transmit Enable)
+
+	USART2->CR1 |= 1 << 13;
+	// UE = 1
+	// Bật USART2 hoạt động
+}
+
+void USART2_SendChar(char c){
+
+	while(!(USART2->SR & 1 << 7));
+	// Chờ TXE = 1
+	// Nghĩa là thanh ghi truyền trống
+	// USART đã sẵn sàng nhận byte mới
+	USART2->DR = c;
+	// Ghi ký tự vào Data Register
+	// USART sẽ tự động truyền dữ liệu ra chân TX
+}
+
+void USART2_SendString(const char *str){
+
+	while(*str){
+		// Duyệt từng ký tự cho tới khi gặp '\0'
+		USART2_SendChar(*str++); // Gửi từng ký tự rồi tăng con trỏ sang ký tự tiếp theo
+	}
+}
+
+int main(){
+	USART2_Init(); // Khởi tạo USART2
+	USART2_SendString("Hello word\r\n");
+	// Gửi chuỗi ra UART
+	// \r\n để xuống dòng trên terminal
+	while(1);
+	// Vòng lặp vô hạn giữ chương trình hoạt động
 }

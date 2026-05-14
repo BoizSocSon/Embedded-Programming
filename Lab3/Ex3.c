@@ -11,6 +11,66 @@
 
 // Lưu ý: Chương trình phải nhận sự kiện nhấn nút hợp lệ (không bị lặp nhiều lần khi giữ nút). Sinh viên làm đến tối thiểu là 5 lần nhấn
 
+#include "stm32f4xx.h"
+
+uint8_t count = 0;
+
+void delay(uint32_t count_val) {
+    for (uint32_t i = 0; i < count_val * 400; i++) {
+        __NOP();
+    }
+}
+
+void blink_led(uint8_t times) {
+    for (uint8_t i = 0; i < times; i++) {
+        GPIOA->BSRR = (1 << 11);
+        delay(2000);
+        GPIOA->BSRR = (1 << 27);
+        delay(2000);
+    }
+}
+
+int main(void) {
+    RCC->AHB1ENR |= (1 << 0);
+    RCC->AHB1ENR |= (1 << 1);
+
+    GPIOA->MODER &= ~(3 << 22);
+    GPIOA->MODER |=  (1 << 22);
+
+    GPIOB->MODER &= ~(3 << 18);
+
+    while (1) {
+        if (!(GPIOB->IDR & (1 << 9))) {
+            delay(20);
+
+            if (!(GPIOB->IDR & (1 << 9))) {
+
+                count++;
+
+                if (count > 5) {
+                    count = 1;
+                }
+
+                while (!(GPIOB->IDR & (1 << 9)));
+
+                delay(20);
+
+                blink_led(count);
+            }
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
 
 #include "stm32f4xx.h"
 

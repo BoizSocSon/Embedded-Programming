@@ -8,6 +8,77 @@
 
 #include "stm32f4xx_hal.h"
 
+void init_gpio(void);
+void init_timer3_interrupt(void);
+void delay_ms(uint32_t ms);
+
+int main(void) {
+    init_gpio();
+    init_timer3_interrupt();
+
+    while (1) {
+        GPIOB->ODR ^= (1 << 7);
+        delay_ms(100);
+    }
+}
+
+void init_gpio(void) {
+  	RCC->AHB1ENR |= (1 << 0);
+	RCC->AHB1ENR |= (1 << 1);
+
+	GPIOA->MODER &= ~(3 << (2 * 5));
+	GPIOA->MODER |= (1 << (2 * 5));
+
+	GPIOB->MODER &= ~(3 << (2 * 7));
+	GPIOB->MODER |= (1 << (2 * 7));
+}
+
+void init_timer3_interrupt(void) {
+    RCC->APB1ENR |= (1 << 1);
+
+    TIM3->PSC = 16000 - 1;
+    TIM3->ARR = 500 - 1;
+
+    TIM3->DIER |= (1 << 0);
+
+	NVIC_SetPriority(TIM3_IRQn, 1);
+	NVIC_EnableIRQ(TIM3_IRQn);
+
+    TIM3->CR1 |= (1 << 0);
+}
+
+void TIM3_IRQHandler(void) {
+    if (TIM3->SR & (1 << 0)) {
+        TIM3->SR &= ~(1 << 0);
+
+        GPIOA->ODR ^= (1 << 5);
+    }
+}
+
+void delay_ms(uint32_t ms) {
+
+    RCC->APB1ENR |= (1 << 0);
+
+    TIM2->PSC = 16000 - 1;
+    TIM2->ARR = ms - 1;
+
+    TIM2->CR1 |= (1 << 0);
+
+    while (!(TIM2->SR & (1 << 0)));
+
+    TIM2->SR &= ~(1 << 0);
+
+    TIM2->CR1 &= ~(1 << 0);
+}
+
+
+
+
+
+
+
+#include "stm32f4xx_hal.h"
+
 // Khai báo các hàm
 void init_gpio(void);
 void init_timer3_interrupt(void);

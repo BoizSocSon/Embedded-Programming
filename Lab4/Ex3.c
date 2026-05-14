@@ -7,6 +7,144 @@
         // 	Khi ngắt SW3 xảy ra: Bật sáng LED 3 giữ nguyên trong khoảng 3 giây, sau đó tắt LED 3.
 // 4.	Yêu cầu kiểm chứng trên lớp: Sinh viên tiến hành kích hoạt ngắt SW1, trong lúc LED 1 đang nhấp nháy chậm thì nhấn tiếp SW2. Trong lúc LED 2 đang nhấp nháy nhanh thì nhấn tiếp SW3. Quan sát và giải thích hiện tượng các ngắt ưu tiên cao hơn liên tục cắt ngang các ngắt ưu tiên thấp hơn, và cách hệ thống quay lại hoàn thành các ngắt cũ sau khi ngắt ưu tiên cao kết thúc.
 
+#include "stm32f4xx.h"
+
+void delay_ms(uint32_t ms);
+void init_leds(void);
+void init_buttons(void);
+void EXTI_Config(void);
+void Update_LEDs(void);
+
+volatile int8_t led_pos = 0;
+
+int main() {
+	init_leds();
+	init_buttons();
+	EXTI_Config();
+
+	while (1) {
+
+	}
+}
+
+void delay_ms(uint32_t ms) {
+	uint32_t count = ms * 1600;
+	while (count--) {
+		__NOP();
+	}
+}
+
+void init_leds(void) {
+	RCC->AHB1ENR |= 1 << 1;
+
+	GPIOB->MODER &= ~(3 << (2 * 0));
+	GPIOB->MODER &= ~(3 << (2 * 1));
+	GPIOB->MODER &= ~(3 << (2 * 2));
+
+	GPIOB->MODER |= (1 << (2 * 0));
+	GPIOB->MODER |= (1 << (2 * 1));
+	GPIOB->MODER |= (1 << (2 * 2));
+
+    // Output push-pull
+    GPIOB->OTYPER &= ~(1 << 0);
+    GPIOB->OTYPER &= ~(1 << 1);
+    GPIOB->OTYPER &= ~(1 << 2);
+
+    // Không pull-up/pull-down
+    GPIOB->PUPDR &= ~(3 << (0 * 2));
+    GPIOB->PUPDR &= ~(3 << (1 * 2));
+    GPIOB->PUPDR &= ~(3 << (2 * 2));
+}
+
+void init_buttons(void) {
+	RCC->AHB1ENR |= 1 << 2;
+
+	GPIOC->MODER &= ~(3 << (2 * 0));
+	GPIOC->MODER &= ~(3 << (2 * 1));
+	GPIOC->MODER &= ~(3 << (2 * 2));
+
+
+	GPIOC->PUPDR &= ~(3 << (2 * 0));
+	GPIOC->PUPDR &= ~(3 << (2 * 1));
+	GPIOC->PUPDR &= ~(3 << (2 * 2));
+
+	GPIOC->PUPDR |= (1 << (2 * 0));
+	GPIOC->PUPDR |= (1 << (2 * 1));
+	GPIOC->PUPDR |= (1 << (2 * 2));
+
+}
+
+void EXTI_Config(void) {
+	RCC->APB2ENR |= (1 << 14);
+
+	SYSCFG->EXTICR[0] &= ~(15 << 0);
+	SYSCFG->EXTICR[0] |= (2 << 0);
+
+	SYSCFG->EXTICR[0] &= ~(15 << 4);
+	SYSCFG->EXTICR[0] |= (2 << 4);
+
+	SYSCFG->EXTICR[0] &= ~(15 << 8);
+	SYSCFG->EXTICR[0] |= (2 << 8);
+
+	EXTI->IMR |= (1 << 0);
+	EXTI->IMR |= (1 << 1);
+	EXTI->IMR |= (1 << 2);
+
+	EXTI->FTSR |= (1 << 0);
+	EXTI->FTSR |= (1 << 1);
+	EXTI->FTSR |= (1 << 2);
+
+	EXTI->RTSR &= ~(1 << 0);
+	EXTI->RTSR &= ~(1 << 1);
+	EXTI->RTSR &= ~(1 << 2);
+
+    NVIC_SetPriorityGrouping(2);
+
+	NVIC_SetPriority(EXTI0_IRQn, 3);
+	NVIC_SetPriority(EXTI1_IRQn, 2);
+	NVIC_SetPriority(EXTI2_IRQn, 1);
+
+	NVIC_EnableIRQ(EXTI0_IRQn);
+	NVIC_EnableIRQ(EXTI1_IRQn);
+	NVIC_EnableIRQ(EXTI2_IRQn);
+}
+
+void EXTI0_IRQHandler(void) {
+	if (EXTI->PR & (1 << 0)) {
+		for (int i = 0; i < 5; i++) {
+			GPIOB->BSRR = (1 << 0);
+			delay_ms(500);
+			GPIOB->BSRR = (1 << (16 + 0));
+			delay_ms(500);
+		}
+
+		EXTI->PR |= (1 << 0);
+	}
+}
+
+void EXTI1_IRQHandler(void) {
+	if (EXTI->PR & (1 << 1)) {
+		for (int i = 0; i < 10; i++) {
+			GPIOB->BSRR = (1 << 1);
+			delay_ms(500);
+			GPIOB->BSRR = (1 << (16 + 1));
+			delay_ms(500);
+		}
+
+		EXTI->PR |= (1 << 1);
+	}
+}
+
+void EXTI2_IRQHandler(void) {
+	if (EXTI->PR & (1 << 2)) {
+		GPIOB->BSRR = (1 << 2);
+		delay_ms(3000);
+		GPIOB->BSRR = (1 << (16 + 2));
+		EXTI->PR |= (1 << 2);
+	}
+}
+
+
 
 // ============ CODE THAY THẾ (CÓ CÁC LỖI) ============
 #include "stm32f4xx.h"
@@ -209,156 +347,6 @@ void EXTI2_IRQHandler(void) {
 		delay_ms(3000);                      // Giữ sáng 3 giây (3000ms)
 		GPIOB->BSRR = (1 << (16 + 2));       // Tắt LED3 (PB2)
 
-		EXTI->PR |= (1 << 2);
-	}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#include "stm32f4xx.h"
-
-void delay_ms(uint32_t ms);
-void init_leds(void);
-void init_buttons(void);
-void EXTI_Config(void);
-void Update_LEDs(void);
-
-volatile int8_t led_pos = 0;
-
-int main() {
-	init_leds();
-	init_buttons();
-	EXTI_Config();
-
-	while (1) {
-
-	}
-}
-
-void delay_ms(uint32_t ms) {
-	uint32_t count = ms * 1600;
-	while (count--) {
-		__NOP();
-	}
-}
-
-void init_leds(void) {
-	RCC->AHB1ENR |= 1 << 1;
-
-	GPIOB->MODER &= ~(3 << (2 * 0));
-	GPIOB->MODER &= ~(3 << (2 * 1));
-	GPIOB->MODER &= ~(3 << (2 * 2));
-
-	GPIOB->MODER |= (1 << (2 * 0));
-	GPIOB->MODER |= (1 << (2 * 1));
-	GPIOB->MODER |= (1 << (2 * 2));
-
-    // Output push-pull
-    GPIOB->OTYPER &= ~(1 << 0);
-    GPIOB->OTYPER &= ~(1 << 1);
-    GPIOB->OTYPER &= ~(1 << 2);
-
-    // Không pull-up/pull-down
-    GPIOB->PUPDR &= ~(3 << (0 * 2));
-    GPIOB->PUPDR &= ~(3 << (1 * 2));
-    GPIOB->PUPDR &= ~(3 << (2 * 2));
-}
-
-void init_buttons(void) {
-	RCC->AHB1ENR |= 1 << 2;
-
-	GPIOC->MODER &= ~(3 << (2 * 0));
-	GPIOC->MODER &= ~(3 << (2 * 1));
-	GPIOC->MODER &= ~(3 << (2 * 2));
-
-
-	GPIOC->PUPDR &= ~(3 << (2 * 0));
-	GPIOC->PUPDR &= ~(3 << (2 * 1));
-	GPIOC->PUPDR &= ~(3 << (2 * 2));
-
-	GPIOC->PUPDR |= (1 << (2 * 0));
-	GPIOC->PUPDR |= (1 << (2 * 1));
-	GPIOC->PUPDR |= (1 << (2 * 2));
-
-}
-
-void EXTI_Config(void) {
-	RCC->APB2ENR |= (1 << 14);
-
-	SYSCFG->EXTICR[0] &= ~(15 << 0);
-	SYSCFG->EXTICR[0] |= (2 << 0);
-
-	SYSCFG->EXTICR[0] &= ~(15 << 4);
-	SYSCFG->EXTICR[0] |= (2 << 4);
-
-	SYSCFG->EXTICR[0] &= ~(15 << 8);
-	SYSCFG->EXTICR[0] |= (2 << 8);
-
-	EXTI->IMR |= (1 << 0);
-	EXTI->IMR |= (1 << 1);
-	EXTI->IMR |= (1 << 2);
-
-	EXTI->FTSR |= (1 << 0);
-	EXTI->FTSR |= (1 << 1);
-	EXTI->FTSR |= (1 << 2);
-
-	EXTI->RTSR &= ~(1 << 0);
-	EXTI->RTSR &= ~(1 << 1);
-	EXTI->RTSR &= ~(1 << 2);
-
-    NVIC_SetPriorityGrouping(2);
-
-	NVIC_SetPriority(EXTI0_IRQn, 3);
-	NVIC_SetPriority(EXTI1_IRQn, 2);
-	NVIC_SetPriority(EXTI2_IRQn, 1);
-
-	NVIC_EnableIRQ(EXTI0_IRQn);
-	NVIC_EnableIRQ(EXTI1_IRQn);
-	NVIC_EnableIRQ(EXTI2_IRQn);
-}
-
-void EXTI0_IRQHandler(void) {
-	if (EXTI->PR & (1 << 0)) {
-		for (int i = 0; i < 5; i++) {
-			GPIOB->BSRR = (1 << 0);
-			delay_ms(500);
-			GPIOB->BSRR = (1 << (16 + 0));
-			delay_ms(500);
-		}
-
-		EXTI->PR |= (1 << 0);
-	}
-}
-
-void EXTI1_IRQHandler(void) {
-	if (EXTI->PR & (1 << 1)) {
-		for (int i = 0; i < 10; i++) {
-			GPIOB->BSRR = (1 << 1);
-			delay_ms(500);
-			GPIOB->BSRR = (1 << (16 + 1));
-			delay_ms(500);
-		}
-
-		EXTI->PR |= (1 << 1);
-	}
-}
-
-void EXTI2_IRQHandler(void) {
-	if (EXTI->PR & (1 << 2)) {
-		GPIOB->BSRR = (1 << 2);
-		delay_ms(3000);
-		GPIOB->BSRR = (1 << (16 + 2));
 		EXTI->PR |= (1 << 2);
 	}
 }

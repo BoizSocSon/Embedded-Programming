@@ -5,6 +5,121 @@
 // 4.	Khi ngắt SW2 xảy ra: Vị trí LED sáng dịch chuyển sang phải 1 bước theo vòng tròn (LED 3 → LED 2 → LED 1 → vòng lại LED 3).
 // 5.	Ràng buộc: Chỉ xử lý logic chuyển đổi trạng thái bật/tắt của các LED bên trong 2 hàm phục vụ ngắt. Vòng lặp while(1) trong chương trình chính chỉ dung để bật sáng LED1.
 
+#include "stm32f4xx.h"
+
+void init_leds(void);
+void init_buttons(void);
+void EXTI_Config(void);
+void Update_LEDs(void);
+
+volatile int8_t led_pos = 0;
+
+int main() {
+	init_leds();
+	init_buttons();
+	EXTI_Config();
+
+	Update_LEDs();
+
+	while (1) {
+
+	}
+}
+
+void init_leds(void) {
+	RCC->AHB1ENR |= 1 << 1;
+
+	GPIOB->MODER &= ~(3 << (2 * 0));
+	GPIOB->MODER &= ~(3 << (2 * 1));
+	GPIOB->MODER &= ~(3 << (2 * 2));
+
+	GPIOB->MODER |= (1 << (2 * 0));
+	GPIOB->MODER |= (1 << (2 * 1));
+	GPIOB->MODER |= (1 << (2 * 2));
+
+    // Output push-pull
+    GPIOB->OTYPER &= ~(1 << 0);
+    GPIOB->OTYPER &= ~(1 << 1);
+    GPIOB->OTYPER &= ~(1 << 2);
+
+    // Không pull-up/pull-down
+    GPIOB->PUPDR &= ~(3 << (0 * 2));
+    GPIOB->PUPDR &= ~(3 << (1 * 2));
+    GPIOB->PUPDR &= ~(3 << (2 * 2));
+}
+
+void init_buttons(void) {
+	RCC->AHB1ENR |= 1 << 2;
+
+	GPIOC->MODER &= ~(3 << (2 * 2));
+	GPIOC->MODER &= ~(3 << (2 * 3));
+
+	GPIOC->PUPDR &= ~(3 << (2 * 2));
+	GPIOC->PUPDR &= ~(3 << (2 * 3));
+	GPIOC->PUPDR |= (1 << (2 * 2));
+	GPIOC->PUPDR |= (1 << (2 * 3));
+}
+
+void EXTI_Config(void) {
+	RCC->APB2ENR |= (1 << 14);
+
+	SYSCFG->EXTICR[0] &= ~(15 << 8);
+	SYSCFG->EXTICR[0] |=  (2 << 8);
+
+	SYSCFG->EXTICR[0] &= ~(15 << 12);
+	SYSCFG->EXTICR[0] |=  (2 << 12);
+
+	EXTI->IMR |= (1 << 2);
+	EXTI->IMR |= (1 << 3);
+
+	EXTI->FTSR |= (1 << 2);
+	EXTI->FTSR |= (1 << 3);
+
+	EXTI->RTSR &= ~(1 << 2);
+	EXTI->RTSR &= ~(1 << 3);
+
+	NVIC_EnableIRQ(EXTI2_IRQn);
+	NVIC_EnableIRQ(EXTI3_IRQn);
+
+}
+
+void Update_LEDs(void) {
+	GPIOB->BSRR = (1 << (16 + 0));
+	GPIOB->BSRR = (1 << (16 + 1));
+	GPIOB->BSRR = (1 << (16 + 2));
+
+	if (led_pos == 0) {
+		GPIOB->BSRR = (1 << 0);
+	} else if (led_pos == 1) {
+		GPIOB->BSRR = (1 << 1);
+	} else if (led_pos == 2) {
+		GPIOB->BSRR = (1 << 2);
+	}
+
+}
+
+void EXTI2_IRQHandler(void) {
+	if (EXTI->PR & (1 << 2)) {
+		EXTI->PR |= (1 << 2);
+
+		led_pos++;
+		if (led_pos > 2) led_pos = 0;
+		Update_LEDs();
+	}
+}
+
+void EXTI3_IRQHandler(void) {
+	if (EXTI->PR & (1 << 3)) {
+		EXTI->PR |= (1 << 3);
+
+		led_pos--;
+		if (led_pos < 0) led_pos = 2;
+		Update_LEDs();
+	}
+}
+
+
+
 
 #include "main.h"
 
@@ -159,121 +274,5 @@ void Error_Handler(void) {
     __disable_irq();
     while (1) {
     }
-}
-
-
-
-
-#include "stm32f4xx.h"
-
-void init_leds(void);
-void init_buttons(void);
-void EXTI_Config(void);
-void Update_LEDs(void);
-
-volatile int8_t led_pos = 0;
-
-int main() {
-	init_leds();
-	init_buttons();
-	EXTI_Config();
-
-	Update_LEDs();
-
-	while (1) {
-
-	}
-}
-
-void init_leds(void) {
-	RCC->AHB1ENR |= 1 << 1;
-
-	GPIOB->MODER &= ~(3 << (2 * 0));
-	GPIOB->MODER &= ~(3 << (2 * 1));
-	GPIOB->MODER &= ~(3 << (2 * 2));
-
-	GPIOB->MODER |= (1 << (2 * 0));
-	GPIOB->MODER |= (1 << (2 * 1));
-	GPIOB->MODER |= (1 << (2 * 2));
-
-    // Output push-pull
-    GPIOB->OTYPER &= ~(1 << 0);
-    GPIOB->OTYPER &= ~(1 << 1);
-    GPIOB->OTYPER &= ~(1 << 2);
-
-    // Không pull-up/pull-down
-    GPIOB->PUPDR &= ~(3 << (0 * 2));
-    GPIOB->PUPDR &= ~(3 << (1 * 2));
-    GPIOB->PUPDR &= ~(3 << (2 * 2));
-}
-
-void init_buttons(void) {
-	RCC->AHB1ENR |= 1 << 2;
-
-	GPIOC->MODER &= ~(3 << (2 * 2));
-	GPIOC->MODER &= ~(3 << (2 * 3));
-
-	GPIOC->PUPDR &= ~(3 << (2 * 2));
-	GPIOC->PUPDR &= ~(3 << (2 * 3));
-	GPIOC->PUPDR |= (1 << (2 * 2));
-	GPIOC->PUPDR |= (1 << (2 * 3));
-}
-
-void EXTI_Config(void) {
-	RCC->APB2ENR |= (1 << 14);
-
-	SYSCFG->EXTICR[0] &= ~(15 << 8);
-	SYSCFG->EXTICR[0] |=  (2 << 8);
-
-	SYSCFG->EXTICR[0] &= ~(15 << 12);
-	SYSCFG->EXTICR[0] |=  (2 << 12);
-
-	EXTI->IMR |= (1 << 2);
-	EXTI->IMR |= (1 << 3);
-
-	EXTI->FTSR |= (1 << 2);
-	EXTI->FTSR |= (1 << 3);
-
-	EXTI->RTSR &= ~(1 << 2);
-	EXTI->RTSR &= ~(1 << 3);
-
-	NVIC_EnableIRQ(EXTI2_IRQn);
-	NVIC_EnableIRQ(EXTI3_IRQn);
-
-}
-
-void Update_LEDs(void) {
-	GPIOB->BSRR = (1 << (16 + 0));
-	GPIOB->BSRR = (1 << (16 + 1));
-	GPIOB->BSRR = (1 << (16 + 2));
-
-	if (led_pos == 0) {
-		GPIOB->BSRR = (1 << 0);
-	} else if (led_pos == 1) {
-		GPIOB->BSRR = (1 << 1);
-	} else if (led_pos == 2) {
-		GPIOB->BSRR = (1 << 2);
-	}
-
-}
-
-void EXTI2_IRQHandler(void) {
-	if (EXTI->PR & (1 << 2)) {
-		EXTI->PR |= (1 << 2);
-
-		led_pos++;
-		if (led_pos > 2) led_pos = 0;
-		Update_LEDs();
-	}
-}
-
-void EXTI3_IRQHandler(void) {
-	if (EXTI->PR & (1 << 3)) {
-		EXTI->PR |= (1 << 3);
-
-		led_pos--;
-		if (led_pos < 0) led_pos = 2;
-		Update_LEDs();
-	}
 }
 

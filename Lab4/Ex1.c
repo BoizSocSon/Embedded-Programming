@@ -6,6 +6,81 @@
 // 4.	Khi nhấn PC8 (Ngắt EXTI8): Sử dụng hàm phục vụ ngắt EXTI9_5_IRQHandler. Trong hàm này, điều khiển LED PA5 tắt hoàn toàn trong một khoảng thời gian (ví dụ 3 giây), sau đó thoát ngắt để chương trình chính tiếp tục việc nhấp nháy.
 // 5.	Có thể thử bấm cùng 1 lúc PC8 và PC13 để xem ngắt nào sẽ được ưu tiên hơn, quan sát kĩ hiện tượng để hiểu hơn về mức độ ưu tiên
 
+
+#include "stm32f4xx.h"
+
+void delay_ms(uint32_t ms) {
+    uint32_t i;
+    for (i = 0; i < ms * 1000; i++);
+}
+
+void GPIO_Config(void) {
+    RCC->AHB1ENR |= (1 << 0) | (1 << 2);
+
+    GPIOA->MODER &= ~(3 << (5 * 2));
+    GPIOA->MODER |=  (1 << (5 * 2));
+
+    GPIOC->MODER &= ~((3 << (13 * 2)) | (3 << (8 * 2)));
+
+    GPIOC->PUPDR &= ~((3 << (13 * 2)) | (3 << (8 * 2)));
+    GPIOC->PUPDR |=  ((1 << (13 * 2)) | (1 << (8 * 2)));
+}
+
+void EXTI_Config(void) {
+    RCC->APB2ENR |= (1 << 14);
+
+    SYSCFG->EXTICR[3] &= ~(15 << 4);
+    SYSCFG->EXTICR[3] |=  (2 << 4);
+
+    SYSCFG->EXTICR[2] &= ~(15 << 0);
+    SYSCFG->EXTICR[2] |=  (2 << 0);
+
+    EXTI->FTSR |= (1 << 8) | (1 << 13);
+    EXTI->RTSR &= ~((1 << 8) | (1 << 13));
+
+    EXTI->IMR |= (1 << 8) | (1 << 13);
+
+    NVIC_SetPriority(EXTI9_5_IRQn, 1);
+    NVIC_SetPriority(EXTI15_10_IRQn, 2);
+    NVIC_SetPriorityGrouping(2);
+
+    NVIC_EnableIRQ(EXTI9_5_IRQn);
+    NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
+
+void EXTI15_10_IRQHandler(void) {
+    if (EXTI->PR & (1 << 13)) {
+        GPIOA->BSRR = (1 << 5);
+        delay_ms(3000);
+        EXTI->PR = (1 << 13);
+    }
+}
+
+void EXTI9_5_IRQHandler(void) {
+    if (EXTI->PR & (1 << 8)) {
+        GPIOA->BSRR = (1 << (5 + 16));
+        delay_ms(3000);
+        EXTI->PR = (1 << 8);
+    }
+}
+
+int main(void) {
+    GPIO_Config();
+    EXTI_Config();
+
+    while (1) {
+        GPIOA->ODR ^= (1 << 5);
+        delay_ms(200);
+    }
+}
+
+
+
+
+
+
+
+
 #include "stm32f4xx.h"
 
 // Hàm delay đơn giản (không chính xác tuyệt đối nhưng đủ dùng để quan sát)
